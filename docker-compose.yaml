@@ -1,0 +1,117 @@
+version: '3.8'
+services:
+  nginx:
+    image: nginx:1.19.3
+    container_name: nginx
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Bangkok
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - './containers/nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
+      - './containers/nginx/conf.d:/etc/nginx/conf.d:ro'
+      - './containers/nginx/snippets:/etc/nginx/snippets:ro'
+      - './certs:/etc/nginx/certs:ro'
+
+  gitlab:
+    image: gitlab/gitlab-ce:13.6.3-ce.0
+    container_name: gitlab
+    restart: unless-stopped
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.cheatnotz.in.th'
+        letsencrypt['enable'] = false
+        prometheus['enable'] = false
+        grafana['enable'] = false
+        postgresql['enable'] = false
+        nginx['real_ip_header'] = 'X-Forwarded-For'
+        nginx['real_ip_recursive'] = 'on'
+        gitlab_rails['time_zone'] = "Asia/Bangkok"
+        gitlab_rails['db_adapter'] = "postgresql"
+        gitlab_rails['db_host'] = "postgres11"
+        gitlab_rails['db_database'] = "gitlabhq_production"
+        gitlab_rails['db_username'] = "gitlab"
+        gitlab_rails['db_password'] = "changeme"
+        gitlab_rails['db_port'] = "5432"
+        redis['enable'] = false
+        gitlab_rails['redis_host'] = "redis"
+        gitlab_rails['redis_port'] = "6379"
+        gitlab_rails['registry_enabled'] = true
+        gitlab_rails['registry_host'] = "registry"
+        gitlab_rails['registry_port'] = "5000"
+        gitlab_rails['registry_api_url'] = "http://registry:5000"
+        gitlab_rails['registry_key_path'] = "/certs/registry-auth.key"
+        gitlab_rails['registry_issuer'] = "gitlab-issuer"
+        gitlab_rails['gitlab_email_enabled'] = true
+        gitlab_rails['gitlab_email_from'] = 'notifications@cheatnotz.in.th'
+        gitlab_rails['gitlab_email_reply_to'] = 'noreply@cheatnotz.in.th'
+        gitlab_rails['incoming_email_address'] = "reply+%{key}@cheatnotz.in.th"
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "smtp.cheatnotz.in.th"
+        gitlab_rails['smtp_port'] = 587
+        gitlab_rails['smtp_user_name'] = "username"
+        gitlab_rails['smtp_password'] = "changeme"
+        gitlab_rails['smtp_domain'] = "cheatnotz.in.th"
+        gitlab_rails['smtp_authentication'] = "login"
+        gitlab_rails['smtp_enable_starttls_auto'] = true
+        gitlab_rails['smtp_tls'] = false
+        gitlab_ci['gitlab_ci_all_broken_builds'] = true
+        gitlab_ci['gitlab_ci_add_pusher'] = true
+    ports:
+      - "22:22"
+    volumes:
+      - './containers/gitlab/config:/etc/gitlab'
+      - './containers/gitlab/data:/var/opt/gitlab'
+      - './containers/gitlab/logs:/var/log/gitlab'
+      - './certs:/certs'
+    depends_on:
+      - redis
+      - postgres11
+      - registry
+
+  redis:
+    image: redis:6.0.9
+    container_name: redis
+    restart: unless-stopped
+    command:
+      - --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - './containers/redis:/var/lib/redis'
+
+  registry:
+    image: registry:2.7.1
+    container_name: registry
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - './containers/registry:/registry'
+      - './certs:/certs:ro'
+    environment:
+      REGISTRY_LOG_LEVEL: "info"
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: "/registry"
+      REGISTRY_AUTH_TOKEN_REALM: "https://gitlab.cheatnotz.in.th/jwt/auth"
+      REGISTRY_AUTH_TOKEN_SERVICE: "container_registry"
+      REGISTRY_AUTH_TOKEN_ISSUER: "gitlab-issuer"
+      REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE: "/certs/registry-auth.crt"
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+
+  postgres11:
+    image: postgres:11.9
+    container_name: postgres11
+    restart: unless-stopped
+    volumes:
+      - './containers/postgres11:/var/lib/postgresql/data'
+    environment:
+      POSTGRES_DB: 'gitlabhq_production'
+      POSTGRES_USER: 'gitlab'
+      POSTGRES_PASSWORD: 'changeme'
+      TZ: 'GMT+7'
+      PGTZ: 'GMT+7'
