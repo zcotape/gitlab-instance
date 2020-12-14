@@ -1,6 +1,6 @@
 # Gitlab Instance
 
-This is a ```docker-compose.yaml``` file for running GitLab instance running in version ```13.6.3-ce```. (Updated at 2020-12-14)
+This is a ```docker-compose.yaml``` file for running GitLab instance running at version ```13.6.3-ce```. (Updated at 2020-12-14)
 
 ## Prerequisite
 * Create a new registry authentication (RA) certificate and key
